@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Charalampos's Adventures — The Whispering Grimoire</title>
+<style>
+  :root{
+    --bg:#0f0f16; --ink:#f8f7f4; --gold:#ffe8b0; --panel:#0c0c12;
+    --ok:#1f6f3d; --err:#7f1d1d; --line:#0008; --inkmut:#e9e5da;
+  }
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Inter,Arial}
+  body.modal-open{overflow:hidden}
+
+  /* ===== SPLASH (library) ===== */
+  #splash{position:fixed; inset:0; z-index:80; display:flex; flex-direction:column; background:#000}
+  #splash::before{content:""; position:absolute; inset:0; background:url("background.jpg") center/cover no-repeat; filter:saturate(.95) contrast(1.05)}
+  .splash-top{position:relative; z-index:1; display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding:18px 20px}
+  .splash-title{margin:0; color:var(--gold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:clamp(19px,3.1vw,34px); text-shadow:0 2px 6px #000}
+  .splash-credit{margin:0; color:#fff; white-space:nowrap; text-shadow:none; font-style:italic; font-size:clamp(14px,1.8vw,18px)}
+  .splash-center{ position:relative; z-index:1; margin:auto; text-align:center; padding:20px; }
+  .enter-btn{background:transparent; border:none; box-shadow:none; text-shadow:none; cursor:pointer; font-family:"Brush Script MT","Segoe Script","URW Chancery L",cursive; font-size:clamp(28px,5vw,48px); color:#fff; padding:0}
+  .enter-btn:hover{opacity:.92}
+  .enter-btn:focus{outline:0}
+
+  /* ===== APP WRAP ===== */
+  .wrap{min-height:100vh;display:flex;flex-direction:column}
+  header{padding:16px 18px;background:#0b0b11;border-bottom:1px solid #0007}
+  header h1{margin:.2em 0;color:var(--gold);font-size:clamp(20px,2.4vw,28px)}
+  header .credit{font-style:italic;opacity:.9;color:var(--inkmut)}
+  header .top-actions{margin-top:8px; display:flex; gap:8px; flex-wrap:wrap}
+
+  main{flex:1; display:grid; grid-template-columns: minmax(520px,560px) minmax(580px,1fr); gap:32px; padding:18px; align-items:start; box-sizing:border-box; max-width:1500px; margin:0 auto; width:100%}
+  @media (max-width:1200px){ main{grid-template-columns:1fr} .board{order:-1} }
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 24px #0008;padding:14px;position:relative}
+
+  /* LEFT BOARD — forbidden section */
+  .board{position:relative;min-height:600px;overflow:hidden;width:100%;max-width:560px;margin:0 auto; background:url("ForbiddenSection.jpg") center/cover no-repeat}
+  .board::before{content:""; position:absolute; inset:0; z-index:0; background:rgba(10,8,20,.45)}
+  .board::after{content:""; position:absolute; inset:0; z-index:0; box-shadow: inset 0 0 80px 18px rgba(0,0,0,.45); pointer-events:none}
+  .node{position:absolute;width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center; border:2px solid #d4af37;background:#0f0a07;color:var(--gold);font-weight:900;cursor:pointer;user-select:none; z-index:2}
+  .node.locked{opacity:.5;cursor:not-allowed;filter:grayscale(.4)}
+  .node.done{background:#102614;border-color:#2d7a45;color:#eaffee}
+  .node.glow{box-shadow:0 0 0 10px rgba(212,175,55,.22),0 0 18px #d4af37}
+  .me{position:absolute;left:0;top:0;width:44px;height:44px;border-radius:50%;border:2px solid #d4af37;background:#1f4d36; z-index:2}
+  .legend{position:absolute;left:14px;bottom:14px;display:flex;gap:10px;flex-wrap:wrap; z-index:2}
+  .pill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid #444;background:#0003;color:var(--inkmut)}
+
+  /* RIGHT CONTENT */
+  #content{min-height:600px; position:relative}
+  h2{margin:.2em 0;color:var(--gold)}
+  .runes{display:flex;gap:8px;margin:8px 0}
+  /* Rune tiles use the same image, letters overlay */
+  .r{position:relative;width:34px;height:34px;border-radius:6px;border:1px solid #d4af37;background:url("Rune.jpg") center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;text-shadow:0 1px 2px #000}
+  .r.got{background:url("Rune.jpg") center/cover no-repeat; border-color:#2c7a45; box-shadow:0 0 0 2px #2c7a45 inset}
+  .box{padding:12px;border:1px solid #0007;border-radius:12px;background:#0f0a07}
+  .q{margin:10px 0;padding:12px;border:1px solid #0006;border-radius:10px;background:#100a07}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .btn{appearance:none;border:1px solid #b78c18;background:linear-gradient(180deg,#7a5a12,#3f2d0a);color:#ffe8a3;border-radius:10px;padding:10px 14px;cursor:pointer}
+  .btn.ghost{border-color:#444;background:#0003;color:#fff}
+  .pill.ok{background:#09361b;border-color:#12552b;color:#d7ffe0}
+  .pill.err{background:#3b0d0d;border-color:#5a1111;color:#ffd7d7}
+  select,button,input,textarea{font-size:17px}
+  input[type="text"]{width:min(720px,100%);padding:10px;border-radius:8px;border:1px solid #333;background:#0b0806;color:var(--ink)}
+  textarea{width:100%;min-height:140px;padding:12px;border-radius:10px;border:1px solid #333;background:#0b0806;color:var(--ink);resize:vertical}
+  .divider{height:1px;background:#0008;margin:14px 0}
+  footer{padding:10px 14px;text-align:center;background:#0b0b11;border-top:1px solid #000;color:#cbbfa9}
+  .choices{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
+  label.choice{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #444;border-radius:10px;background:#0003;cursor:pointer}
+
+  /* ======= Modals ======= */
+  #modalBackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50}
+  .modal{display:none;position:fixed;inset:0;z-index:51;align-items:center;justify-content:center}
+  .modal-card{width:min(900px,94vw);max-height:90vh;overflow:auto;background:#140c08;border:1px solid #000; box-shadow:0 20px 40px #000;border-radius:14px;padding:16px}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap}
+  .modal-title{margin:0;color:var(--gold);font-size:1.2rem}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:800px){ .two-col{grid-template-columns:1fr} .modal-card{padding:14px} }
+
+  /* Characters gallery */
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  .thumb{position:relative;border-radius:12px;overflow:hidden;border:1px solid #222;background:#0b0806}
+  .thumb img{width:100%;aspect-ratio:9/16;object-fit:cover;display:block}
+  .thumb .cap{position:absolute;inset:auto 0 0 0;background:linear-gradient(180deg,transparent,rgba(0,0,0,.75)); color:#fff;padding:8px 10px;font-size:.9rem}
+  .thumb button{position:absolute;inset:0;opacity:0}
+  .gallery-note{color:#cbbfa9;font-size:.95rem;margin-top:6px}
+
+  /* Lightbox viewer */
+  #viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:60;align-items:center;justify-content:center}
+  #viewerInner{max-width:min(1100px,92vw);max-height:92vh;display:flex;flex-direction:column;gap:10px}
+  #viewerImg{max-width:100%;max-height:82vh;object-fit:contain;border-radius:12px}
+  #viewerCap{color:#fff;text-align:center}
+  .viewer-actions{position:fixed;inset:0;pointer-events:none}
+  .viewer-btn{pointer-events:auto;position:absolute;top:50%;transform:translateY(-50%); background:#0008;border:1px solid #555;color:#fff;border-radius:12px;padding:10px 14px;cursor:pointer}
+  .viewer-btn.prev{left:12px}
+  .viewer-btn.next{right:12px}
+  .viewer-btn.close{top:12px;right:12px;transform:none}
+
+  /* Decorative top-corner cat (replaces book art) */
+  .book-note{
+    position:absolute; right:-6px; top:-120px; width:min(128px,18%); aspect-ratio:4/3;
+    background:url("cat.jpg") center/cover no-repeat;
+    border-radius:10px; border:2px solid #3a2a1a;
+    box-shadow: inset 0 0 35px 12px rgba(0,0,0,.55),
+                inset 0 0 8px 2px rgba(255,140,0,.15),
+                0 10px 24px rgba(0,0,0,.5);
+    filter: sepia(.18) contrast(1.05);
+    outline:2px dashed rgba(0,0,0,.25);
+    outline-offset:-8px;
+    pointer-events:none;
+    z-index:2;
+  }
+  @media (max-width:800px){
+    .book-note{width:112px; right:-4px; top:-100px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Splash ===== -->
+<section id="splash" aria-label="Intro screen with library">
+  <div class="splash-top">
+    <h1 class="splash-title">Charalampos's Adventures — The Whispering Grimoire</h1>
+    <p class="splash-credit">Created: Panagiotis Domvros, English and Drama Educator, All Rights Reserved</p>
+  </div>
+  <div class="splash-center">
+    <button class="enter-btn" id="enterBtn" type="button" aria-label="Enter the library">Enter</button>
+  </div>
+</section>
+
+<!-- ===== App ===== -->
+<div id="app" class="wrap" style="display:none">
+  <header>
+    <h1>Charalampos's Adventures — The Whispering Grimoire</h1>
+    <div class="credit">Created: Panagiotis Domvros, English and Drama Educator, All Rights Reserved</div>
+    <div class="top-actions">
+      <button class="btn" type="button" id="openStory">Story Intro</button>
+      <button class="btn ghost" type="button" id="openCodex">Codex & Glossary</button>
+      <button class="btn ghost" type="button" id="openCharacters">Characters</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT: BOARD -->
+    <section class="panel board" id="board" aria-label="Quest Board">
+      <div id="me" class="me" title="Charalampos"></div>
+      <div class="node" id="n1" style="left:22px;top:24px" role="button" tabindex="0" aria-label="Node 1">1</div>
+      <div class="node locked" id="n2" style="left:150px;top:140px" role="button" tabindex="0" aria-label="Node 2">2</div>
+      <div class="node locked" id="n3" style="left:50px;top:280px" role="button" tabindex="0" aria-label="Node 3">3</div>
+      <div class="node locked" id="n4" style="left:220px;top:340px" role="button" tabindex="0" aria-label="Node 4">4</div>
+      <div class="node locked" id="n5" style="left:360px;top:230px" role="button" tabindex="0" aria-label="Node 5">5</div>
+      <div class="node locked" id="n6" style="left:440px;top:360px" role="button" tabindex="0" aria-label="Node 6">6</div>
+      <div class="node locked" id="n7" style="left:440px;top:120px" role="button" tabindex="0" aria-label="Finale">🏆</div>
+
+      <div class="legend" aria-hidden="true">
+        <span class="pill">Click <b>1</b> to start</span>
+        <span class="pill">Green = done</span>
+        <span class="pill">🏆 = Sealed Chamber</span>
+      </div>
+    </section>
+
+    <!-- RIGHT: TASKS -->
+    <section class="panel" id="content">
+      <div class="book-note" aria-hidden="true"></div>
+
+      <div id="intro">
+        <h2>Welcome to the Forbidden Library</h2>
+        <p>This chapter of <b>Charalampos's Adventures</b> centres on a whispering book that answers only well-formed questions — and keeps secrets unless they are retold correctly.</p>
+        <div class="runes"><div class="r" id="r1">_</div><div class="r" id="r2">_</div><div class="r" id="r3">_</div><div class="r" id="r4">_</div><div class="r" id="r5">_</div><div class="r" id="r6">_</div></div>
+        <p><button class="btn" id="startQuest" type="button">Start Quest</button></p>
+        <div class="divider"></div>
+        <div class="box"><b>Tip:</b> Ask politely, report faithfully. Open <i>Story Intro</i> any time for a refresher.</div>
+      </div>
+
+      <!-- TASK 1 -->
+<div id="t1" style="display:none">
+  <h2>Task 1 — Library Vocabulary</h2>
+  <p>Choose the correct word for each definition. </p>
+
+  <div class="q">a quietly spoken rumour —
+    <select id="v1"><option value="">—</option><option value="whisper">whisper</option><option value="order">order</option><option value="evidence">evidence</option></select>
+  </div>
+  <div class="q">a polite request —
+    <select id="v2"><option value="">—</option><option value="command">command</option><option value="enquiry">enquiry</option><option value="threat">threat</option></select>
+  </div>
+  <div class="q">facts that show something is true —
+    <select id="v3"><option value="">—</option><option value="evidence">evidence</option><option value="gossip">gossip</option><option value="promise">promise</option></select>
+  </div>
+  <div class="q">to say sorry —
+    <select id="v4"><option value="">—</option><option value="apologise">apologise</option><option value="authorise">authorise</option><option value="memorise">memorise</option></select>
+  </div>
+  <div class="q">official permission (noun) —
+    <select id="v5"><option value="">—</option><option value="licence">licence</option><option value="license">license</option><option value="lesson">lesson</option></select>
+  </div>
+  <div class="q">someone who tells others what to do —
+    <select id="v6"><option value="">—</option><option value="commander">commander</option><option value="librarian">librarian</option><option value="listener">listener</option></select>
+  </div>
+  <div class="q">a person who manages books and helps readers —
+    <select id="v7"><option value="">—</option><option value="librarian">librarian</option><option value="merchant">merchant</option><option value="sorcerer">sorcerer</option></select>
+  </div>
+  <div class="q">unconfirmed information shared by people —
+    <select id="v8"><option value="">—</option><option value="rumour">rumour</option><option value="evidence">evidence</option><option value="enquiry">enquiry</option></select>
+  </div>
+  <div class="q">the act of giving formal permission (noun) —
+    <select id="v9"><option value="">—</option><option value="authorisation">authorisation</option><option value="apology">apology</option><option value="invitation">invitation</option></select>
+  </div>
+  <div class="q">a strong warning that something bad will happen —
+    <select id="v10"><option value="">—</option><option value="threat">threat</option><option value="request">request</option><option value="reply">reply</option></select>
+  </div>
+
+  <div class="row"><button class="btn" id="check1">Check</button><span id="msg1" class="pill" aria-live="polite"></span></div>
+</div>
+
+
+      <!-- TASK 2 -->
+<div id="t2" style="display:none">
+  <h2>Task 2 — Reported Speech (Statements)</h2>
+
+  <div class="q">Iris: “The book is dangerous.” → Iris said that the book ___ dangerous.
+    <select id="rs1"><option value="">—</option><option value="is">is</option><option value="was">was</option></select>
+  </div>
+  <div class="q">Drakon: “You are careful.” → Drakon told me that I ___ careful.
+    <select id="rs2"><option value="">—</option><option value="am">am</option><option value="was">was</option></select>
+  </div>
+  <div class="q">Drakon: “I found a clue yesterday.” → Drakon said that he ___ a clue the day before.
+    <select id="rs3"><option value="">—</option><option value="found">found</option><option value="had found">had found</option></select>
+  </div>
+  <div class="q">Iris: “We will open it soon.” → Iris said that they ___ open it soon.
+    <select id="rs4"><option value="">—</option><option value="would">would</option><option value="will">will</option></select>
+  </div>
+  <div class="q">Charalampos: “I saw it last night.” → Charalampos said that he ___ it the night before.
+    <select id="rs5"><option value="">—</option><option value="saw">saw</option><option value="had seen">had seen</option></select>
+  </div>
+  <div class="q">Iris: “We took the key two days ago.” → Iris said that they ___ the key two days earlier.
+    <select id="rs6"><option value="">—</option><option value="took">took</option><option value="had taken">had taken</option></select>
+  </div>
+  <div class="q">Drakon: “I can’t read it.” → Drakon said that he ___ read it.
+    <select id="rs7"><option value="">—</option><option value="can’t">can’t</option><option value="couldn’t">couldn’t</option></select>
+  </div>
+  <div class="q">Iris: “There is a secret room.” → Iris said that there ___ a secret room.
+    <select id="rs8"><option value="">—</option><option value="is">is</option><option value="was">was</option></select>
+  </div>
+  <div class="q">Drakon: “We are meeting today.” → Drakon said that they ___ that day.
+    <select id="rs9"><option value="">—</option><option value="are meeting">are meeting</option><option value="were meeting">were meeting</option></select>
+  </div>
+  <div class="q">Charalampos: “I have finished the list.” → Charalampos said that he ___ the list.
+    <select id="rs10"><option value="">—</option><option value="has finished">has finished</option><option value="had finished">had finished</option></select>
+  </div>
+
+  <div class="row"><button class="btn" id="check2">Check</button><span id="msg2" class="pill" aria-live="polite"></span></div>
+</div>
+
+
+      <!-- TASK 3 -->
+<div id="t3" style="display:none">
+  <h2>Task 3 — Reported Commands & Requests</h2>
+
+  <div class="q">Iris: “Bring me the Grimoire.” → Iris ordered Charalampos ___ the Grimoire.
+    <select id="rc1"><option value="">—</option><option value="bring">bring</option><option value="to bring">to bring</option></select>
+  </div>
+  <div class="q">Iris: “Please do not touch the runes.” → Iris asked us ___ the runes.
+    <select id="rc2"><option value="">—</option><option value="to not touch">to not touch</option><option value="not to touch">not to touch</option></select>
+  </div>
+  <div class="q">Drakon: “Tell me the answer!” → Drakon told me ___ him the answer.
+    <select id="rc3"><option value="">—</option><option value="to tell">to tell</option><option value="tell">tell</option></select>
+  </div>
+  <div class="q">Iris: “Open the cover slowly.” → Iris told us ___ the cover slowly.
+    <select id="rc4"><option value="">—</option><option value="open">open</option><option value="to open">to open</option></select>
+  </div>
+  <div class="q">Iris: “Keep your voice low.” → Iris advised us ___ our voices low.
+    <select id="rc5"><option value="">—</option><option value="keep">keep</option><option value="to keep">to keep</option></select>
+  </div>
+  <div class="q">Charalampos: “Wait here for me.” → Charalampos asked Iris ___ there for him.
+    <select id="rc6"><option value="">—</option><option value="wait">wait</option><option value="to wait">to wait</option></select>
+  </div>
+  <div class="q">Iris: “Explain the riddle.” → Iris told Drakon ___ the riddle.
+    <select id="rc7"><option value="">—</option><option value="explain">explain</option><option value="to explain">to explain</option></select>
+  </div>
+  <div class="q">Drakon: “Be quiet.” → Drakon ordered us ___ quiet.
+    <select id="rc8"><option value="">—</option><option value="be">be</option><option value="to be">to be</option></select>
+  </div>
+  <div class="q">Iris: “Write the answer clearly.” → Iris told me ___ the answer clearly.
+    <select id="rc9"><option value="">—</option><option value="write">write</option><option value="to write">to write</option></select>
+  </div>
+  <div class="q">Charalampos: “Show me the page.” → Charalampos asked Drakon ___ him the page.
+    <select id="rc10"><option value="">—</option><option value="show">show</option><option value="to show">to show</option></select>
+  </div>
+
+  <div class="row"><button class="btn" id="check3">Check</button><span id="msg3" class="pill" aria-live="polite"></span></div>
+</div>
+
+
+      <!-- TASK 4 -->
+<div id="t4" style="display:none">
+  <h2>Task 4 — Reported Questions</h2>
+
+  <div class="q">Drakon: “Where did you hide it?” → Drakon asked where I ___ it.
+    <select id="rq1"><option value="">—</option><option value="hid">hid</option><option value="had hidden">had hidden</option></select>
+  </div>
+  <div class="q">Iris: “Do you understand the clue?” → Iris asked if I ___ the clue.
+    <select id="rq2"><option value="">—</option><option value="understand">understand</option><option value="understood">understood</option></select>
+  </div>
+  <div class="q">Iris: “When will you return it?” → Iris asked when we ___ return it.
+    <select id="rq3"><option value="">—</option><option value="would">would</option><option value="will">will</option></select>
+  </div>
+  <div class="q">Iris: “Where is the key?” → Iris asked where the key ___.
+    <select id="rq4"><option value="">—</option><option value="is">is</option><option value="was">was</option></select>
+  </div>
+  <div class="q">Charalampos: “Why did they leave?” → Charalampos asked why they ___.
+    <select id="rq5"><option value="">—</option><option value="left">left</option><option value="had left">had left</option></select>
+  </div>
+  <div class="q">Drakon: “Do you know her?” → Drakon asked if I ___ her.
+    <select id="rq6"><option value="">—</option><option value="know">know</option><option value="knew">knew</option></select>
+  </div>
+  <div class="q">Iris: “Can you help me?” → Iris asked if I ___ help her.
+    <select id="rq7"><option value="">—</option><option value="can">can</option><option value="could">could</option></select>
+  </div>
+  <div class="q">Charalampos: “Have you seen it?” → Charalampos asked whether I ___ it.
+    <select id="rq8"><option value="">—</option><option value="have seen">have seen</option><option value="had seen">had seen</option></select>
+  </div>
+  <div class="q">Iris: “What time will it start?” → Iris asked what time it ___ start.
+    <select id="rq9"><option value="">—</option><option value="will">will</option><option value="would">would</option></select>
+  </div>
+  <div class="q">Drakon: “Who wrote this?” → Drakon asked who ___ it.
+    <select id="rq10"><option value="">—</option><option value="wrote">wrote</option><option value="had written">had written</option></select>
+  </div>
+
+  <div class="row"><button class="btn" id="check4">Check</button><span id="msg4" class="pill" aria-live="polite"></span></div>
+</div>
+
+
+      <!-- TASK 5 -->
+<div id="t5" style="display:none">
+  <h2>Task 5 — Polite vs Rude Enquiry</h2>
+
+  <div class="q">Could you tell me who wrote the spell?
+    <label><input type="radio" name="f1" value="F"> Formal</label>
+    <label><input type="radio" name="f1" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">Who wrote this, then?
+    <label><input type="radio" name="f2" value="F"> Formal</label>
+    <label><input type="radio" name="f2" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">May I ask whether the book is authentic?
+    <label><input type="radio" name="f3" value="F"> Formal</label>
+    <label><input type="radio" name="f3" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">Tell me now: where is it?
+    <label><input type="radio" name="f4" value="F"> Formal</label>
+    <label><input type="radio" name="f4" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">Would you mind explaining the first clue?
+    <label><input type="radio" name="f5" value="F"> Formal</label>
+    <label><input type="radio" name="f5" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">So, are you going to tell me or not?
+    <label><input type="radio" name="f6" value="F"> Formal</label>
+    <label><input type="radio" name="f6" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">I would like to know where the key is kept.
+    <label><input type="radio" name="f7" value="F"> Formal</label>
+    <label><input type="radio" name="f7" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">You, tell me the answer now.
+    <label><input type="radio" name="f8" value="F"> Formal</label>
+    <label><input type="radio" name="f8" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">Could you possibly check the index for me?
+    <label><input type="radio" name="f9" value="F"> Formal</label>
+    <label><input type="radio" name="f9" value="I"> Informal/Rude</label>
+  </div>
+  <div class="q">What’s the point of this question?
+    <label><input type="radio" name="f10" value="F"> Formal</label>
+    <label><input type="radio" name="f10" value="I"> Informal/Rude</label>
+  </div>
+
+  <div class="row"><button class="btn" id="check5">Check</button><span id="msg5" class="pill" aria-live="polite"></span></div>
+</div>
+
+
+      <!-- TASK 6 -->
+<div id="t6" style="display:none">
+  <h2>Task 6 — Reported & Indirect Questions (Checkable)</h2>
+  <p>Choose the correct reported version. </p>
+
+  <div class="q">Iris: “Close the book now.” → Iris told us ___ the book.
+    <select id="w6_1"><option value="">—</option><option value="to close">to close</option><option value="close">close</option></select>
+  </div>
+  <div class="q">Drakon: “Do you know the answer?” → Drakon asked if we ___ the answer.
+    <select id="w6_2"><option value="">—</option><option value="knew">knew</option><option value="know">know</option></select>
+  </div>
+  <div class="q">Charalampos: “I’m tired.” → Charalampos said that he ___ tired.
+    <select id="w6_3"><option value="">—</option><option value="is">is</option><option value="was">was</option></select>
+  </div>
+  <div class="q">Iris: “Where are the notes?” → Iris asked where the notes ___.
+    <select id="w6_4"><option value="">—</option><option value="were">were</option><option value="are">are</option></select>
+  </div>
+  <div class="q">Drakon: “Don’t touch that page.” → Drakon warned us ___ that page.
+    <select id="w6_5"><option value="">—</option><option value="to not touch">to not touch</option><option value="not to touch">not to touch</option></select>
+  </div>
+  <div class="q">Iris: “We have found the key.” → Iris said that they ___ the key.
+    <select id="w6_6"><option value="">—</option><option value="had found">had found</option><option value="have found">have found</option></select>
+  </div>
+  <div class="q">Charalampos: “Will you help me?” → Charalampos asked if I ___ help him.
+    <select id="w6_7"><option value="">—</option><option value="would">would</option><option value="will">will</option></select>
+  </div>
+  <div class="q">Drakon: “I must finish today.” → Drakon said that he ___ finish that day.
+    <select id="w6_8"><option value="">—</option><option value="must">must</option><option value="had to">had to</option></select>
+  </div>
+  <div class="q">Iris: “Who took the map?” → Iris asked who ___ the map.
+    <select id="w6_9"><option value="">—</option><option value="took">took</option><option value="had taken">had taken</option></select>
+  </div>
+  <div class="q">Charalampos: “There are two doors.” → Charalampos said that there ___ two doors.
+    <select id="w6_10"><option value="">—</option><option value="are">are</option><option value="were">were</option></select>
+  </div>
+
+  <div class="row"><button class="btn" id="check6">Check</button><span id="msg6" class="pill" aria-live="polite"></span></div>
+</div>
+
+
+      <!-- FINALE -->
+      <div id="finale" style="display:none">
+        <h2>Sealed Chamber Unlocked!</h2>
+        <p><b>Victory!</b> With Iris’s wisdom and Charalampos’s courage, Drakon is outwitted and the Whispering Grimoire is safe. Next time: <b>Charalampos's Adventures — The Vanishing Tower</b>.</p>
+        <div class="runes"><div class="r got">G</div><div class="r got">R</div><div class="r got">I</div><div class="r got">M</div><div class="r got">O</div><div class="r got">R</div><div class="r got">E</div></div>
+        <div class="row"><button class="btn" id="replay">Play again</button></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>✨✍️ Devised by Panagiotis Domvros, English and Drama Teacher, All Rights Reserved ✍️✨</footer>
+</div>
+
+<!-- ======= Backdrop ======= -->
+<div id="modalBackdrop" aria-hidden="true"></div>
+
+<!-- Story Intro Modal -->
+<div id="storyModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="storyTitle" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="storyTitle" class="modal-title">Story Intro — The Whispering Grimoire</h2>
+      <button class="btn ghost" id="closeStory" type="button">Close</button>
+    </div>
+    <div id="storyPages">
+      <div class="storyPage">
+        <h3>1) Setup</h3>
+        <p>In the <b>Academy of Lithourgia</b>, a forbidden book has appeared on the highest shelf. It whispers answers only to good questions — and hides truths unless they are retold correctly.</p>
+        <p><b>Charalampos Keramefs</b> (you) must master reported speech and polite questions before <b>Drakon Malveris</b> twists the book to his advantage, with guidance from <b>Iris</b>, the librarian.</p>
+      </div>
+      <div class="storyPage" style="display:none">
+        <h3>2) Characters</h3>
+        <ul>
+          <li><b>Charalampos Keramefs</b> — our polite but determined hero.</li>
+          <li><b>Iris</b> — librarian and grammar expert.</li>
+          <li><b>Drakon Malveris</b> — rival; rude questions and rash decisions.</li>
+        </ul>
+      </div>
+      <div class="storyPage" style="display:none">
+        <h3>3) The Mystery</h3>
+        <p>The Grimoire answers a question only once. If repeated badly, it falls silent. Collect reported statements and form polite enquiries to unlock the next pages.</p>
+      </div>
+      <div class="storyPage" style="display:none">
+        <h3>4) How to Play</h3>
+        <ol>
+          <li><b>Vocabulary</b> (whisper, enquiry, evidence…)</li>
+          <li><b>Reported speech</b> — statements</li>
+          <li><b>Reported speech</b> — commands/requests</li>
+          <li><b>Reported questions</b> (if/whether, wh-)</li>
+          <li><b>Register</b> (polite vs rude enquiries)</li>
+          <li><b>Write</b> your rumour + indirect question</li>
+        </ol>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:10px;align-items:center;gap:8px">
+      <button class="btn ghost" id="prevStory" type="button">◀ Prev</button>
+      <div class="pill" id="storyStep" aria-live="polite">1 / 4</div>
+      <button class="btn" id="nextStory" type="button">Next ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- Codex & Glossary Modal -->
+<div id="codexModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="codexTitle" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="codexTitle" class="modal-title">Codex & Glossary</h2>
+      <button class="btn ghost" id="closeCodex" type="button">Close</button>
+    </div>
+    <div class="two-col">
+      <div class="box">
+        <h3>Glossary</h3>
+        <ul style="columns:2;column-gap:16px">
+          <li><b>whisper</b> — quiet speech</li>
+          <li><b>enquiry</b> — polite question</li>
+          <li><b>evidence</b> — facts that prove something</li>
+          <li><b>apologise</b> — say you are sorry</li>
+          <li><b>licence</b> — official permission (noun)</li>
+          <li><b>authorise</b> — give permission (verb)</li>
+          <li><b>report</b> — retell information</li>
+          <li><b>indirect question</b> — question inside a sentence</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h3>Polite Language</h3>
+        <ul>
+          <li><b>Could you</b> / <b>May I</b> …?</li>
+          <li><b>I would like to know</b> whether/if…</li>
+          <li><b>Yours faithfully,</b> (formal closing)</li>
+        </ul>
+        <p class="gallery-note">Characters and places have moved to the <b>Characters</b> tab.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Characters Modal -->
+<div id="charactersModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="charactersTitle" aria-hidden="true">
+  <div class="modal-card" style="width:min(1000px,95vw)">
+    <div class="modal-head">
+      <h2 id="charactersTitle" class="modal-title">Characters</h2>
+      <button class="btn ghost" id="closeCharacters" type="button">Close</button>
+    </div>
+    <div class="gallery" id="gallery">
+      <figure class="thumb" data-src="Charalampos Keramefs.jpg" data-cap="Charalampos Keramefs — The Hero">
+        <img src="Charalampos Keramefs.jpg" alt="Charalampos Keramefs" loading="lazy">
+        <figcaption class="cap">Charalampos Keramefs</figcaption><button aria-label="View Charalampos Keramefs"></button>
+      </figure>
+      <figure class="thumb" data-src="Iris.jpg" data-cap="Iris — Grammar Expert">
+        <img src="Iris.jpg" alt="Iris" loading="lazy">
+        <figcaption class="cap">Iris</figcaption><button aria-label="View Iris"></button>
+      </figure>
+      <figure class="thumb" data-src="Drakon Malveris.jpg" data-cap="Drakon Malveris — Rival">
+        <img src="Drakon Malveris.jpg" alt="Drakon Malveris" loading="lazy">
+        <figcaption class="cap">Drakon Malveris</figcaption><button aria-label="View Drakon Malveris"></button>
+      </figure>
+    </div>
+    <p class="gallery-note">Click any card to enlarge. Use ◀ ▶ or swipe to navigate; press Esc to close.</p>
+  </div>
+</div>
+
+<!-- Lightbox viewer -->
+<div id="viewer" role="dialog" aria-modal="true" aria-label="Image viewer">
+  <div id="viewerInner">
+    <img id="viewerImg" alt="">
+    <div id="viewerCap"></div>
+  </div>
+  <div class="viewer-actions">
+    <button class="viewer-btn prev" id="viewerPrev" aria-label="Previous">◀</button>
+    <button class="viewer-btn next" id="viewerNext" aria-label="Next">▶</button>
+    <button class="viewer-btn close" id="viewerClose" aria-label="Close">✕</button>
+  </div>
+</div>
+
+<!-- Lore / Interlude Modal -->
+<div id="loreModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="loreTitle" aria-hidden="true">
+  <div class="modal-card" style="width:min(760px,92vw)">
+    <div class="modal-head">
+      <h2 id="loreTitle" class="modal-title">A Page Turns…</h2>
+      <button class="btn ghost" id="closeLore" type="button">Continue</button>
+    </div>
+    <div id="loreText" class="box" style="font-size:1.05rem;line-height:1.5"></div>
+  </div>
+</div>
+
+<script>
+/* ===== Splash control ===== */
+document.getElementById('enterBtn').addEventListener('click', ()=>{
+  const splash = document.getElementById('splash');
+  splash.style.opacity = '0';
+  splash.style.pointerEvents = 'none';
+  setTimeout(()=>{ splash.style.display='none'; }, 150);
+  document.getElementById('app').style.display='flex';
+});
+
+/* ===== Helpers ===== */
+const $=s=>document.querySelector(s);
+function show(id){['intro','t1','t2','t3','t4','t5','t6','finale'].forEach(x=>$('#'+x).style.display='none'); $('#'+id).style.display='block';}
+function tokenTo(nodeId){ const n=$('#'+nodeId), me=$('#me'); me.style.left=n.style.left; me.style.top=n.style.top; }
+function lock(id,yes){ $('#'+id).classList.toggle('locked', !!yes); }
+function done(id){ $('#'+id).classList.add('done'); }
+function giveRune(i,letter){ const el=$('#r'+i); el.textContent=letter; el.classList.add('got'); }
+
+/* ===== Start state ===== */
+tokenTo('n1'); $('#n1').classList.add('glow'); show('intro');
+
+/* ===== Board clicks ===== */
+['n1','n2','n3','n4','n5','n6','n7'].forEach(id=>{
+  const el = $('#'+id);
+  el.addEventListener('click',()=>{
+    if(el.classList.contains('locked')) return;
+    const tid = id==='n7' ? 'finale' : 't'+id.slice(1);
+    if(id==='n1') $('#n1').classList.remove('glow');
+    show(tid);
+  });
+  el.addEventListener('keydown',e=>{
+    if((e.key==='Enter'||e.key===' ') && !el.classList.contains('locked')){
+      e.preventDefault(); el.click();
+    }
+  });
+});
+
+$('#startQuest').onclick=()=>{ $('#n1').classList.remove('glow'); show('t1'); };
+
+/* ===== Modal utilities ===== */
+const backdrop = $('#modalBackdrop');
+const storyModal = $('#storyModal');
+const codexModal = $('#codexModal');
+const charactersModal = $('#charactersModal');
+const loreModal = $('#loreModal');
+function openModal(el){ backdrop.style.display='block'; el.style.display='flex'; el.setAttribute('aria-hidden','false'); document.body.classList.add('modal-open'); }
+function closeModal(el){
+  el.style.display='none'; el.setAttribute('aria-hidden','true');
+  const anyOpen = [storyModal,codexModal,charactersModal,loreModal].some(m=>m.style.display==='flex');
+  if(!anyOpen) { backdrop.style.display='none'; document.body.classList.remove('modal-open'); }
+}
+
+/* Buttons to open/close modals */
+$('#openStory').addEventListener('click',()=>openModal(storyModal));
+$('#closeStory').addEventListener('click',()=>closeModal(storyModal));
+$('#openCodex').addEventListener('click',()=>openModal(codexModal));
+$('#closeCodex').addEventListener('click',()=>closeModal(codexModal));
+$('#openCharacters').addEventListener('click',()=>openModal(charactersModal));
+$('#closeCharacters').addEventListener('click',()=>closeModal(charactersModal));
+$('#closeLore').addEventListener('click',()=>closeModal(loreModal));
+
+/* Backdrop click closes whichever modal is open */
+backdrop.addEventListener('click',()=>[storyModal,codexModal,charactersModal,loreModal].forEach(m=>{ if(m.style.display==='flex') closeModal(m); }));
+
+/* ESC key to close topmost open modal or viewer */
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    if($('#viewer').style.display==='flex'){ closeViewer(); return; }
+    const openInOrder=[loreModal,charactersModal,codexModal,storyModal];
+    const top=openInOrder.find(m=>m.style.display==='flex'); if(top) closeModal(top);
+  }
+});
+
+/* Story paging */
+const pages = Array.from(document.querySelectorAll('#storyPages .storyPage'));
+let pageIndex = 0;
+function showStoryPage(i){ pageIndex=Math.max(0,Math.min(i,pages.length-1)); pages.forEach((p,idx)=>p.style.display=(idx===pageIndex?'block':'none')); $('#storyStep').textContent=(pageIndex+1)+' / '+pages.length; }
+$('#nextStory').addEventListener('click',()=>showStoryPage(pageIndex+1));
+$('#prevStory').addEventListener('click',()=>showStoryPage(pageIndex-1));
+showStoryPage(0);
+
+/* Interludes */
+const loreText = $('#loreText');
+const loreByStage = {
+  1: `Vocabulary unlocked. The page rustles: “Repeat it clearly, and I shall answer.”`,
+  2: `Your reports sound true. The margins note: “Mind your tenses.”`,
+  3: `Requests recorded. The ribbon hums: “Order, ask, forbid — gently.”`,
+  4: `Questions reframed. The ink settles: “If… whether… when… now proceed.”`,
+  5: `Tone refined. The cover warms: “Politeness opens doors.”`,
+  6: `Your writing convinces. The lock clicks in the Sealed Chamber.`
+};
+function showInterlude(stageNum){ loreText.textContent=loreByStage[stageNum]||'Another page turns in the library.'; openModal(loreModal); }
+
+/* ===== TASK CHECKERS ===== */
+// ===== TASK CHECKERS (updated for 10 items each) =====
+$('#check1').onclick = () => {
+  const ok =
+    ($('#v1').value==='whisper') &&
+    ($('#v2').value==='enquiry') &&
+    ($('#v3').value==='evidence') &&
+    ($('#v4').value==='apologise') &&
+    ($('#v5').value==='licence') &&
+    ($('#v6').value==='commander') &&
+    ($('#v7').value==='librarian') &&
+    ($('#v8').value==='rumour') &&
+    ($('#v9').value==='authorisation') &&
+    ($('#v10').value==='threat');
+  const msg = $('#msg1');
+  if(ok){ msg.textContent='✓ Correct. Rune: G'; msg.className='pill ok'; done('n1'); lock('n2',false); giveRune(1,'G'); tokenTo('n2'); showInterlude(1); }
+  else { msg.textContent='✗ Some answers are incorrect.'; msg.className='pill err'; }
+};
+
+$('#check2').onclick = () => {
+  const ok =
+    ($('#rs1').value==='was') &&
+    ($('#rs2').value==='was') &&
+    ($('#rs3').value==='had found') &&
+    ($('#rs4').value==='would') &&
+    ($('#rs5').value==='had seen') &&  // note: we used the text 'had seen' in the select? We used 'had seen'. If not, change here to match.
+    ($('#rs6').value==='had taken') &&
+    ($('#rs7').value==='couldn’t') &&
+    ($('#rs8').value==='was') &&
+    ($('#rs9').value==='were meeting') &&
+    ($('#rs10').value==='had finished');
+  const msg = $('#msg2');
+  if(ok){ msg.textContent='✓ Well done. Rune: R'; msg.className='pill ok'; done('n2'); lock('n3',false); giveRune(2,'R'); tokenTo('n3'); showInterlude(2); }
+  else { msg.textContent='✗ Watch backshift in reported speech.'; msg.className='pill err'; }
+};
+
+$('#check3').onclick = () => {
+  const ok =
+    ($('#rc1').value==='to bring') &&
+    ($('#rc2').value==='not to touch') &&
+    ($('#rc3').value==='to tell') &&
+    ($('#rc4').value==='to open') &&
+    ($('#rc5').value==='to keep') &&
+    ($('#rc6').value==='to wait') &&
+    ($('#rc7').value==='to explain') &&
+    ($('#rc8').value==='to be') &&
+    ($('#rc9').value==='to write') &&
+    ($('#rc10').value==='to show');
+  const msg=$('#msg3');
+  if(ok){ msg.textContent='✓ Great. Rune: I'; msg.className='pill ok'; done('n3'); lock('n4',false); giveRune(3,'I'); tokenTo('n4'); showInterlude(3); }
+  else { msg.textContent='✗ Use to-infinitive; use “not to” for negatives.'; msg.className='pill err'; }
+};
+
+$('#check4').onclick = () => {
+  const ok =
+    ($('#rq1').value==='had hidden') &&
+    ($('#rq2').value==='understood') &&
+    ($('#rq3').value==='would') &&
+    ($('#rq4').value==='was') &&
+    ($('#rq5').value==='had left') &&
+    ($('#rq6').value==='knew') &&
+    ($('#rq7').value==='could') &&
+    ($('#rq8').value==='had seen') &&
+    ($('#rq9').value==='would') &&
+    ($('#rq10').value==='had written');
+  const msg=$('#msg4');
+  if(ok){ msg.textContent='✓ Excellent. Rune: M'; msg.className='pill ok'; done('n4'); lock('n5',false); giveRune(4,'M'); tokenTo('n5'); showInterlude(4); }
+  else { msg.textContent='✗ Indirect questions: no question word order; check tense.'; msg.className='pill err'; }
+};
+
+$('#check5').onclick = () => {
+  const val = name => { const x=document.querySelector('input[name="'+name+'"]:checked'); return x?x.value:''; };
+  const ok =
+    (val('f1')==='F') &&
+    (val('f2')==='I') &&
+    (val('f3')==='F') &&
+    (val('f4')==='I') &&
+    (val('f5')==='F') &&
+    (val('f6')==='I') &&
+    (val('f7')==='F') &&
+    (val('f8')==='I') &&
+    (val('f9')==='F') &&
+    (val('f10')==='I');
+  const msg=$('#msg5');
+  if(ok){ msg.textContent='✓ Correct classification. Rune: O'; msg.className='pill ok'; done('n5'); lock('n6',false); giveRune(5,'O'); tokenTo('n6'); showInterlude(5); }
+  else { msg.textContent='✗ Formal = polite/indirect; avoid commands and sarcasm.'; msg.className='pill err'; }
+};
+
+$('#check6').onclick = () => {
+  const ok =
+    ($('#w6_1').value==='to close') &&
+    ($('#w6_2').value==='knew') &&
+    ($('#w6_3').value==='was') &&
+    ($('#w6_4').value==='were') &&
+    ($('#w6_5').value==='not to touch') &&
+    ($('#w6_6').value==='had found') &&
+    ($('#w6_7').value==='would') &&
+    ($('#w6_8').value==='had to') &&
+    ($('#w6_9').value==='had taken') &&
+    ($('#w6_10').value==='were');
+  const msg=$('#msg6');
+  if(ok){
+    msg.textContent='✓ Looks good! The Grimoire accepts your words. Rune: R';
+    msg.className='pill ok';
+    done('n6'); lock('n7', false); giveRune(6,'R'); tokenTo('n7'); showInterlude(6);
+    setTimeout(()=>{ closeModal(document.getElementById('loreModal')); show('finale'); }, 800);
+  } else {
+    msg.textContent='✗ Some items are incorrect. Check tense backshift and “if/whether”, and use the to-infinitive for commands.';
+    msg.className='pill err';
+  }
+};
+
+
+/* Replay */
+$('#replay').onclick=()=>location.reload();
+
+/* ===== Characters: lightbox viewer logic ===== */
+const gallery = $('#gallery');
+const viewer = $('#viewer');
+const viewerImg = $('#viewerImg');
+const viewerCap = $('#viewerCap');
+const viewerPrev = $('#viewerPrev');
+const viewerNext = $('#viewerNext');
+const viewerClose = $('#viewerClose');
+let items = [];
+let idx = 0;
+
+function collectItems(){
+  items = Array.from(gallery.querySelectorAll('.thumb')).map(el=>({
+    src: el.dataset.src,
+    cap: el.dataset.cap || el.querySelector('.cap')?.textContent || ''
+  }));
+}
+collectItems();
+
+function openViewer(i){
+  idx = Math.max(0, Math.min(i, items.length-1));
+  const it = items[idx];
+  viewerImg.src = it.src;
+  viewerImg.alt = it.cap || 'Character image';
+  viewerCap.textContent = it.cap;
+  viewer.style.display = 'flex';
+}
+function closeViewer(){ viewer.style.display='none'; }
+function next(){ openViewer((idx+1)%items.length); }
+function prev(){ openViewer((idx-1+items.length)%items.length); }
+
+gallery.addEventListener('click', (e)=>{
+  const card = e.target.closest('.thumb'); if(!card) return;
+  const i = Array.from(gallery.querySelectorAll('.thumb')).indexOf(card);
+  openViewer(i);
+});
+viewerNext.addEventListener('click', next);
+viewerPrev.addEventListener('click', prev);
+viewerClose.addEventListener('click', closeViewer);
+viewer.addEventListener('click', (e)=>{ if(e.target===viewer) closeViewer(); });
+document.addEventListener('keydown',(e)=>{
+  if(viewer.style.display==='flex'){
+    if(e.key==='ArrowRight') next();
+    else if(e.key==='ArrowLeft') prev();
+  }
+});
+</script>
+</body>
+</html>
